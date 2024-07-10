@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #status, #error {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        #progress-bar {
+            width: 100%;
+            background-color: #f0f0f0;
+            padding: 3px;
+            border-radius: 3px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+        }
+        #progress-bar-fill {
+            display: block;
+            height: 22px;
+            background-color: #659cef;
+            border-radius: 3px;
+            transition: width 500ms ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <h1>Video Generator</h1>
+    <input type="text" id="topic" placeholder="Enter a topic">
+    <button onclick="generateVideo()">Generate Video</button>
+    <div id="status"></div>
+    <div id="progress-bar" style="display:none;">
+        <span id="progress-bar-fill" style="width: 0%;"></span>
+    </div>
+    <div id="error" style="color: red;"></div>
+    <script>
+        let taskId = null;
+
+        async function generateVideo() {
+            const topic = document.getElementById('topic').value;
+            if (!topic) {
+                alert('Please enter a topic');
+                return;
+            }
+
+            document.getElementById('status').textContent = 'Starting video generation...';
+            document.getElementById('progress-bar').style.display = 'block';
+            document.getElementById('error').textContent = '';
+
+            try {
+                const response = await fetch('http://localhost:5000/generate_video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ topic }),
+                });
+
+                const data = await response.json();
+                taskId = data.task_id;
+                checkStatus();
+            } catch (error) {
+                document.getElementById('error').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function checkStatus() {
+            if (!taskId) return;
+
+            try {
+                const response = await fetch(`http://localhost:5000/video_status/${taskId}`);
+                const data = await response.json();
+
+                document.getElementById('status').textContent = `Status: ${data.status}`;
+                document.getElementById('progress-bar-fill').style.width = `${data.progress}%`;
+
+                if (data.status === 'Completed') {
+                    document.getElementById('status').innerHTML += '<br><a href="/download_video/' + taskId + '">Download Video</a>';
+                } else if (data.status === 'Failed') {
+                    document.getElementById('error').textContent = 'Error: ' + data.error;
+                } else {
+                    setTimeout(checkStatus, 5000);  // Check again in 5 seconds
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = 'Error checking status: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
